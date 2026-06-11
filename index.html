@@ -6,7 +6,7 @@
   <title>Portfolio — Visualizza PDF</title>
   <style>
     html,body { height:100%; margin:0; background:#000; }
-    iframe { border:0; width:100%; height:100vh; display:block; }
+    .viewer { width:100%; height:100vh; border:0; display:block; }
     .toplink {
       position: absolute;
       right: 12px;
@@ -23,17 +23,17 @@
   </style>
 </head>
 <body>
-  <!-- Link per aprire / scaricare direttamente il PDF -->
-  <a class="toplink" href="https://raw.githubusercontent.com/CeciliaFumanti/portfolio_pdf/ca5f585b42b8ae22f3e771e47325fda70a811217/Portfolio_Cecilia_Fumanti_2026.pdf" target="_blank" rel="noopener">Apri / Scarica PDF</a>
+  <a class="toplink" href="Portfolio_Cecilia_Fumanti_2026.pdf" target="_blank" rel="noopener">Apri / Scarica PDF</a>
 
-  <!-- Iframe che mostra il PDF -->
-  <iframe
-    src="https://raw.githubusercontent.com/CeciliaFumanti/portfolio_pdf/ca5f585b42b8ae22f3e771e47325fda70a811217/Portfolio_Cecilia_Fumanti_2026.pdf"
+  <!-- Usa percorso relativo: il file deve essere in docs/ -->
+  <iframe class="viewer"
+    src="Portfolio_Cecilia_Fumanti_2026.pdf#view=FitH"
     title="Portfolio Cecilia Fumanti 2026">
-    <!-- Fallback per browser che non supportano iframe -->
-    <p>Il tuo browser non supporta l'embed dei PDF. Puoi aprire il PDF direttamente qui:
-      <a href="https://raw.githubusercontent.com/CeciliaFumanti/portfolio_pdf/ca5f585b42b8ae22f3e771e47325fda70a811217/Portfolio_Cecilia_Fumanti_2026.pdf" target="_blank" rel="noopener">Portfolio_Cecilia_Fumanti_2026.pdf</a>
+    <p>Il tuo browser non supporta l'embed dei PDF. Apri direttamente:
+      <a href="Portfolio_Cecilia_Fumanti_2026.pdf" target="_blank" rel="noopener">Portfolio_Cecilia_Fumanti_2026.pdf</a>
     </p>
   </iframe>
+
+  <!-- Se vuoi maggiore compatibilità (es. browser vecchi) -> usa PDF.js -->
 </body>
 </html>
