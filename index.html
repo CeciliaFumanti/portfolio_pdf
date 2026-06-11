@@ -7,6 +7,9 @@
   
   <!-- Inclusione di PDF.js da CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  
+  <!-- Inclusione del foglio di stile ufficiale per il Text Layer di PDF.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf_viewer.min.css">
 
   <style>
     html, body {
@@ -34,11 +37,17 @@
       max-width: 1000px;
       background: #1e1e24;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-      overflow: hidden;
       display: flex;
       justify-content: center;
       align-items: center;
       transition: transform 0.3s ease;
+    }
+
+    /* Contenitore interno per allineare perfettamente Canvas e Text Layer */
+    .page-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
     }
 
     /* Canvas dove viene disegnato il PDF */
@@ -52,6 +61,24 @@
 
     .page-canvas.loaded {
       opacity: 1;
+    }
+
+    /* Sovrapposizione del Text Layer per la selezione del testo */
+    .textLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100% !important;
+      height: 100% !important;
+      opacity: 1;
+      mix-blend-mode: multiply;
+      pointer-events: auto;
+    }
+
+    /* Rende il testo selezionabile ma trasparente per vedere il canvas sotto */
+    .textLayer span {
+      color: transparent !important;
+      cursor: text;
     }
 
     /* Animazione di caricamento all'interno di ogni pagina */
@@ -144,7 +171,6 @@
       const pagesToRender = [];
 
       // Passaggio 1: Crea i wrapper segnaposto con l'aspect ratio corretto
-      // Leggiamo la prima pagina per stimare l'aspect ratio medio prima di renderizzare
       pdf.getPage(1).then(firstPage => {
         const viewport = firstPage.getViewport({ scale: 1 });
         const aspectRatio = viewport.height / viewport.width;
@@ -152,7 +178,6 @@
         for (let pageNum = 1; pageNum <= numPages; pageNum++) {
           const wrapper = document.createElement('div');
           wrapper.className = 'page-wrapper';
-          // Imposta l'altezza proporzionale alla larghezza per evitare salti di layout durante lo scrolling
           wrapper.style.aspectRatio = (1 / aspectRatio).toString();
           wrapper.dataset.pageNum = pageNum;
 
@@ -160,18 +185,23 @@
           loader.className = 'page-loader';
           wrapper.appendChild(loader);
 
+          // Contenitore interno per Canvas + Text Layer
+          const pageContainer = document.createElement('div');
+          pageContainer.className = 'page-container';
+          wrapper.appendChild(pageContainer);
+
           const canvas = document.createElement('canvas');
           canvas.className = 'page-canvas';
-          wrapper.appendChild(canvas);
+          pageContainer.appendChild(canvas);
 
           container.appendChild(wrapper);
-          pagesToRender.push({ pageNum, wrapper, canvas, loader, rendered: false });
+          pagesToRender.push({ pageNum, wrapper, pageContainer, canvas, loader, rendered: false });
         }
 
         // Passaggio 2: Configura l'IntersectionObserver per il caricamento lazy
         const observerOptions = {
-          root: null, // usa la viewport del browser
-          rootMargin: '400px 0px', // inizia a caricare quando la pagina è a 400px dall'entrare nella viewport
+          root: null,
+          rootMargin: '400px 0px',
           threshold: 0
         };
 
@@ -184,7 +214,6 @@
 
               if (pageData && !pageData.rendered) {
                 pageData.rendered = true;
-                // Smetti di osservare questa pagina una volta che avviamo il rendering
                 observer.unobserve(wrapper);
                 renderPage(pdf, pageData);
               }
@@ -192,7 +221,6 @@
           });
         }, observerOptions);
 
-        // Associa l'observer a tutti i wrapper di pagina
         pagesToRender.forEach(p => {
           observer.observe(p.wrapper);
         });
@@ -206,14 +234,18 @@
         '</div>';
     });
 
-    // Funzione per renderizzare una singola pagina su canvas
+    // Funzione per renderizzare una singola pagina su canvas + text layer
     function renderPage(pdf, pageData) {
       pdf.getPage(pageData.pageNum).then(page => {
-        // Calcoliamo la scala per una risoluzione definita (es. larghezza base 1200px per alta qualità)
+        const dpr = window.devicePixelRatio || 1;
+        const containerWidth = pageData.wrapper.clientWidth || 1000;
+        
         const unscaledViewport = page.getViewport({ scale: 1 });
-        const targetWidth = 1400; // Ottima via di mezzo per qualità/performance
-        const scale = targetWidth / unscaledViewport.width;
-        const viewport = page.getViewport({ scale: scale });
+        const baseScale = containerWidth / unscaledViewport.width;
+        
+        // 1. Rendering del Canvas (con DPR per alta nitidezza)
+        const renderScale = baseScale * dpr;
+        const viewport = page.getViewport({ scale: renderScale });
 
         const canvas = pageData.canvas;
         const ctx = canvas.getContext('2d');
@@ -221,15 +253,34 @@
         canvas.width = viewport.width;
         canvas.height = viewport.height;
 
+        canvas.style.width = '100%';
+        canvas.style.height = 'auto';
+
         const renderContext = {
           canvasContext: ctx,
           viewport: viewport
         };
 
         page.render(renderContext).promise.then(() => {
-          // Nascondi lo spinner specifico e mostra la pagina renderizzata
           pageData.loader.classList.add('hidden');
           canvas.classList.add('loaded');
+
+          // 2. Rendering del Text Layer (con scala base del layout CSS)
+          const textViewport = page.getViewport({ scale: baseScale });
+          
+          const textLayerDiv = document.createElement('div');
+          textLayerDiv.className = 'textLayer';
+          
+          pageData.pageContainer.appendChild(textLayerDiv);
+
+          page.getTextContent().then(textContent => {
+            pdfjsLib.renderTextLayer({
+              textContent: textContent,
+              container: textLayerDiv,
+              viewport: textViewport,
+              textDivs: []
+            });
+          });
         });
       }).catch(err => {
         console.error('Errore nel rendering della pagina ' + pageData.pageNum, err);
